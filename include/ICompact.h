@@ -13,9 +13,6 @@ public:
 
     static RC setLogger(ILogger* const logger);
 
-    virtual size_t getDim() const = 0;
-    virtual IMultiIndex* getGrid() const = 0;
-
     virtual bool isInside(IVector const * const&vec) const = 0;
     /*
     * Method creating new IVector and assigning new address to val
@@ -26,24 +23,26 @@ public:
     */
     virtual RC getVectorCoords(IMultiIndex const *index, IVector * const& val) const = 0;
 
-    virtual RC setLeftBoundary(IVector const * vec) = 0;
-    virtual RC setRightBoundary(IVector const * vec) = 0;
-    virtual RC setGrid(IMultiIndex const *nodeQuantities) = 0;
+    // левейшая по всем координатам
+    virtual RC getLeftBoundary(IVector *& vec) const = 0;
+    // правейшая по всем координатам
+    virtual RC getRightBoundary(IVector *& vec) const = 0;
+    virtual size_t getDim() const = 0;
+    virtual IMultiIndex* getGrid() const = 0;
 
-    static ICompact* createIntersection(ICompact const *op1, ICompact const *op2, double tol);
+    //  grid используется для задания сетки на получившемся пересечении
+    static ICompact* createIntersection(ICompact const *op1, ICompact const *op2, IMultiIndex const* const grid, double tol);
     /* CompactSpan - компактная оболочка: строим наименьшее компактное множество, содержащее 2 переданных */
-    static ICompact* createCompactSpan(ICompact const *op1, ICompact const *op2);
+    static ICompact* createCompactSpan(ICompact const *op1, ICompact const *op2, IMultiIndex const* const grid);
 
     class IIterator {
     public:
-        virtual IIterator * getMovedIterator(IVector const *inc) = 0;
+        virtual IIterator * getMovedIterator() = 0;
         virtual IIterator * clone() const = 0;
 
         static RC setLogger(ILogger * const pLogger);
 
-        virtual RC moveIterator(IVector const *inc) = 0;
-
-        static bool equal(const IIterator *op1, const IIterator *op2);
+        virtual RC moveForwardIterator() = 0;
 
         /*
         * Method creating new IVector and assigning new address to val
@@ -56,12 +55,6 @@ public:
 
         virtual ~IIterator() = 0;
 
-    protected:
-        /*
-         * Every iterator corresponds to grid node -> corresponds to some multi-index, method necessary for comparison
-         */
-        LIB_LOCAL virtual IMultiIndex const * const getIndex() const = 0;
-
     private:
         IIterator(const IIterator&) = delete;
         IIterator& operator=(const IIterator&) = delete;
@@ -70,9 +63,11 @@ public:
         IIterator() = default;
     };
 
-    IIterator * getIterator(IVector const *vec) const = 0;
-    IIterator * getBegin() const = 0;
-    IIterator * getEnd() const = 0;
+    virtual IIterator* getIterator(IMultiIndex const * const&index, IMultiIndex const * const &bypassOrder) const = 0;
+    // возвращает итератор на левейшую границу
+    virtual IIterator* getBegin(IMultiIndex const * const &bypassOrder) const = 0;
+    // возвращает итератор на правейшую границу
+    virtual IIterator* getEnd(IMultiIndex const * const &bypassOrder) const = 0;
 
 private:
     ICompact(const ICompact& compact) = delete;
