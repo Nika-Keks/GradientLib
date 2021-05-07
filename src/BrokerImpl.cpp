@@ -18,7 +18,7 @@ namespace {
         }
 
         void* getInterfaceImpl(INTERFACE_IMPL impl) const override {
-            return (impl == INTERFACE_IMPL::IPROBLEM) ? IProblem::CreateProblem() : NULL;
+            return NULL;//(impl == INTERFACE_IMPL::IPROBLEM) ? IProblem::createProblem(nullptr, nullptr) : NULL;
         }
 
         void release() override {
@@ -28,6 +28,8 @@ namespace {
     };
     BrokerImpl* BrokerImpl::m_instance = nullptr;
 };
+
+IBroker::~IBroker() {}
 
 extern "C" {
     LIB_EXPORT void* getBroker() {
