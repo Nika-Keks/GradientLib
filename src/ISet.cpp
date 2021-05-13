@@ -4,6 +4,7 @@
 #include <memory>
 #include <functional>
 #include <utility>
+#include <cmath>
 
 #define SendLog(Logger, Code, Level) if (Logger != nullptr) Logger->log((Code), (Level), __FILE__, __func__, __LINE__)
 #define SendSevere(Logger, Code) if (Logger != nullptr) Logger->severe((Code), __FILE__, __func__, __LINE__)
@@ -22,7 +23,7 @@ namespace{
 
         inline void vectorIsValid(IVector const* const& vec, RC& rc, const char* const& srcfile, const char* const& function, int line) const;
 
-        inline void indexIncIsValid(size_t indexInc, RC& rc, const char* const& srcfile, const char* const& function, int line) const;
+        static inline void indexIncIsValid(size_t indexInc, RC& rc, const char* const& srcfile, const char* const& function, int line) ;
 
     public:
 
@@ -84,7 +85,7 @@ RC SetControlBlock::getPrevious(IVector *const &vec, size_t &index, size_t index
         return validArgumentsRC;
 
     for (size_t i = 0; i < _set->getSize(); i++)
-        if (index < (*_hashCodesPtr)[_set->getSize() - 1 - i]) {
+        if (index > (*_hashCodesPtr)[_set->getSize() - 1 - i]) {
             size_t newIndex = _set->getSize() - 1 - i;
             if (newIndex - 1 + indexInc >= _set->getSize()){
                 SendInfo(_logger, RC::INDEX_OUT_OF_BOUND);
@@ -142,7 +143,7 @@ RC SetControlBlock::getEnd(IVector *const &vec, size_t &index) const {
 }
 
 SetControlBlock::~SetControlBlock(){
-    delete _setIsValid;
+    delete [] _setIsValid;
 }
 
 SetControlBlock::SetControlBlock(ISet *set, const size_t *const *const &hashCodesPtr,
@@ -169,7 +170,7 @@ void SetControlBlock::vectorIsValid(const IVector *const &vec, RC &rc, const cha
 }
 
 void SetControlBlock::indexIncIsValid(size_t indexInc, RC &rc, const char *const &srcfile, const char *const &function,
-                                      int line) const{
+                                      int line) {
     if (indexInc == 0){
         rc = RC::INVALID_ARGUMENT;
         if (_logger != nullptr)
@@ -298,40 +299,8 @@ RC Iterator::moveIterator(std::function<RC(IVector* const&, size_t&)> const & mo
 }
 
 RC Iterator::next(size_t indexInc) {
-    //auto moveTo = std::bind(&ISetControlBlock::getNext, _setCB.get(), std::placeholders::_1, std::placeholders::_2, indexInc);
-    //return moveIterator(moveTo);
-
-    if (_data == nullptr){
-        SendInfo(_logger, RC::INDEX_OUT_OF_BOUND);
-        return RC::INDEX_OUT_OF_BOUND;
-    }
-    size_t hash = _hash;
-    IVector* vec = IVector::createVector(_dim, _data);
-    if (vec == nullptr){
-        SendInfo(_logger, RC::NULLPTR_ERROR);
-        return RC::NULLPTR_ERROR;
-    }
-
-    RC getNextRC = _setCB->getNext(vec, hash, indexInc); //moveTo(vec, hash);
-    if (getNextRC == RC::SOURCE_SET_EMPTY ||
-        getNextRC == RC::SOURCE_SET_DESTROYED ||
-        getNextRC == RC::INDEX_OUT_OF_BOUND){
-        delete vec;
-        delete [] _data;
-        _data = nullptr;
-        return getNextRC;
-    }
-    if (getNextRC != RC::SUCCESS){
-        delete vec;
-        SendInfo(_logger, getNextRC);
-        return getNextRC;
-    }
-    _hash = hash;
-    std::memcpy(_data, vec->getData(), _dim * sizeof(double));
-    delete vec;
-
-    return RC::SUCCESS;
-
+    auto moveTo = std::bind(&ISetControlBlock::getNext, _setCB.get(), std::placeholders::_1, std::placeholders::_2, indexInc);
+    return moveIterator(moveTo);
 }
 
 RC Iterator::previous(size_t indexInc) {
@@ -340,7 +309,7 @@ RC Iterator::previous(size_t indexInc) {
 }
 
 bool Iterator::isValid() const {
-    return _data != nullptr;
+    return nullptr != _data;
 }
 
 RC Iterator::makeBegin() {
@@ -420,7 +389,6 @@ namespace
     class Set : public ISet
     {
     private:
-        static ILogger* _logger;
         size_t _dim;
         size_t _size;
         size_t _capacity;
@@ -472,6 +440,7 @@ namespace
 
         inline void indexIsValid(size_t index, RC& rc, const char* const& srcfile, const char* const& function, int line) const;
 
+        static ILogger* _logger;
     };
 
     ILogger* Set::_logger = nullptr;
@@ -488,27 +457,372 @@ LIB_EXPORT ISet *ISet::createSet() {
 }
 
 LIB_EXPORT ISet *ISet::makeIntersection(const ISet *const &op1, const ISet *const &op2, IVector::NORM n, double tol) {
-    return nullptr;
+    if (op1 == nullptr || op2 == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return nullptr;
+    }
+    if (std::isnan(tol) || std::isinf(tol) || tol <= 0.){
+        SendInfo(Set::_logger, RC::INVALID_ARGUMENT);
+        return nullptr;
+    }
+    if (op1->getSize() == 0)
+        return op1->clone();
+    if (op2->getSize() == 0)
+        return op2->clone();
+    if (op1->getDim() != op2->getDim()){
+        SendInfo(Set::_logger, RC::MISMATCHING_DIMENSIONS);
+        return nullptr;
+    }
+
+    auto setRes = ISet::createSet();
+    if (setRes == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return nullptr;
+    }
+    auto it = op1->getBegin();
+    if (it == nullptr){
+        delete setRes;
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return nullptr;
+    }
+    IVector* vec;
+    RC getVectorRC = it->getVectorCopy(vec);
+    auto checkError = [it, setRes, vec](bool cond){
+        if (cond){
+            delete it;
+            delete vec;
+            delete setRes;
+            return true;
+        }
+        return false;
+    };
+    if (checkError(getVectorRC != RC::SUCCESS)){
+        SendInfo(Set::_logger, getVectorRC);
+        return nullptr;
+    }
+    do{
+        RC foundVectorRC = op2->findFirst(vec, n, tol);
+        if (foundVectorRC == RC::SUCCESS) {
+            RC insertVectorRC = setRes->insert(vec, n, tol);
+            if (checkError(insertVectorRC != RC::SUCCESS)) {
+                SendInfo(Set::_logger, insertVectorRC);
+                return nullptr;
+            }
+        }
+        RC nextItRC = it->next();
+        if (checkError(nextItRC != RC::SUCCESS && nextItRC != RC::INDEX_OUT_OF_BOUND)){
+            SendInfo(Set::_logger, nextItRC);
+            return nullptr;
+        }
+        if (!it->isValid())
+            break;
+        RC setVector = it->getVectorCoords(vec);
+        if (checkError(setVector != RC::SUCCESS)){
+            SendInfo(Set::_logger, setVector);
+            return nullptr;
+        }
+    }while(true);
+    delete vec;
+    delete it;
+
+    return setRes;
 }
 
 LIB_EXPORT ISet *ISet::makeUnion(const ISet *const &op1, const ISet *const &op2, IVector::NORM n, double tol) {
-    return nullptr;
+    if (op1 == nullptr || op2 == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return nullptr;
+    }
+    if (std::isnan(tol) || std::isinf(tol) || tol <= 0.){
+        SendInfo(Set::_logger, RC::INVALID_ARGUMENT);
+        return nullptr;
+    }
+    if (op1->getSize() == 0)
+        return op2->clone();
+    if (op2->getSize() == 0)
+        return op1->clone();
+    if (op1->getDim() != op2->getDim()){
+        SendInfo(Set::_logger, RC::MISMATCHING_DIMENSIONS);
+        return nullptr;
+    }
+    auto setRes = op1->clone();
+    if (setRes == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return nullptr;
+    }
+    auto it = op2->getBegin();
+    if (it == nullptr){
+        delete setRes;
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return nullptr;
+    }
+    IVector* vec = nullptr;
+    RC setVectorRC = it->getVectorCopy(vec);
+    auto release = [setRes, it, vec](){
+        delete setRes;
+        delete it;
+        delete vec;
+    };
+    if (setVectorRC != RC::SUCCESS){
+        release();
+        SendInfo(Set::_logger, setVectorRC);
+        return nullptr;
+    }
+    do{
+        RC insertVecRC = setRes->insert(vec, n, tol);
+        if (insertVecRC != RC::SUCCESS && insertVecRC != RC::VECTOR_ALREADY_EXIST){
+            release();
+            SendInfo(Set::_logger, insertVecRC);
+            return nullptr;
+        }
+        RC getNextItRC = it->next();
+        if (getNextItRC != RC::SUCCESS && getNextItRC != RC::INDEX_OUT_OF_BOUND){
+            release();
+            SendInfo(Set::_logger, getNextItRC);
+            return nullptr;
+        }
+        if (!it->isValid())
+            break;
+        RC copyVectorRC = it->getVectorCoords(vec);
+        if (copyVectorRC != RC::SUCCESS){
+            release();
+            SendInfo(Set::_logger, copyVectorRC);
+            return nullptr;
+        }
+    } while(true);
+    delete it;
+    delete vec;
+    return setRes;
 }
 
 LIB_EXPORT ISet *ISet::sub(const ISet *const &op1, const ISet *const &op2, IVector::NORM n, double tol) {
-    return nullptr;
-}
+    if (op1 == nullptr || op2 == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return nullptr;
+    }
+    if (std::isnan(tol) || std::isinf(tol) || tol <= 0.){
+        SendInfo(Set::_logger, RC::INVALID_ARGUMENT);
+        return nullptr;
+    }
+    if (op1->getSize() == 0)
+        return op2->clone();
+    if (op2->getSize() == 0)
+        return op1->clone();
+    if (op1->getDim() != op2->getDim()){
+        SendInfo(Set::_logger, RC::MISMATCHING_DIMENSIONS);
+        return nullptr;
+    }
+    auto setRes = op1->clone();
+    if (setRes == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return nullptr;
+    }
+    auto it = op2->getBegin();
+    if (it == nullptr){
+        delete setRes;
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return nullptr;
+    }
+    IVector* vec = nullptr;
+    RC setVectorRC = it->getVectorCopy(vec);
+    auto release = [setRes, it, vec](){
+        delete setRes;
+        delete it;
+        delete vec;
+    };
+    if (setVectorRC != RC::SUCCESS){
+        release();
+        SendInfo(Set::_logger, setVectorRC);
+        return nullptr;
+    }
+    do{
+        RC insertVecRC = setRes->remove(vec, n, tol);
+        if (insertVecRC != RC::SUCCESS && insertVecRC != RC::VECTOR_NOT_FOUND){
+            release();
+            SendInfo(Set::_logger, insertVecRC);
+            return nullptr;
+        }
+        RC getNextItRC = it->next();
+        if (getNextItRC != RC::SUCCESS && getNextItRC != RC::INDEX_OUT_OF_BOUND){
+            release();
+            SendInfo(Set::_logger, getNextItRC);
+            return nullptr;
+        }
+        if (!it->isValid())
+            break;
+        RC copyVectorRC = it->getVectorCoords(vec);
+        if (copyVectorRC != RC::SUCCESS){
+            release();
+            SendInfo(Set::_logger, copyVectorRC);
+            return nullptr;
+        }
+    } while(true);
+    delete it;
+    delete vec;
+    return setRes;}
 
 LIB_EXPORT ISet *ISet::symSub(const ISet *const &op1, const ISet *const &op2, IVector::NORM n, double tol) {
-    return nullptr;
+    if (op1 == nullptr || op2 == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return nullptr;
+    }
+    if (std::isnan(tol) || std::isinf(tol) || tol <= 0.){
+        SendInfo(Set::_logger, RC::INVALID_ARGUMENT);
+        return nullptr;
+    }
+    if (op1->getSize() == 0)
+        return op2->clone();
+    if (op2->getSize() == 0)
+        return op1->clone();
+    if (op1->getDim() != op2->getDim()){
+        SendInfo(Set::_logger, RC::MISMATCHING_DIMENSIONS);
+        return nullptr;
+    }
+    auto setUnion = ISet::makeUnion(op1, op2, n, tol);
+    auto setInters = ISet::makeIntersection(op1, op2, n, tol);
+    auto symSub = ISet::sub(setUnion, setInters, n, tol);
+    delete setInters;
+    delete setUnion;
+    return symSub;
 }
 
 LIB_EXPORT bool ISet::equals(const ISet *const &op1, const ISet *const &op2, IVector::NORM n, double tol) {
-    return false;
+    if (op1 == nullptr || op2 == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return false;
+    }
+    if (std::isnan(tol) || std::isinf(tol) || tol <= 0.){
+        SendInfo(Set::_logger, RC::INVALID_ARGUMENT);
+        return false;
+    }
+    if (op1 == op2)
+        return true;
+
+    if (op1->getDim() != op2->getDim()){
+        SendInfo(Set::_logger, RC::MISMATCHING_DIMENSIONS);
+        return false;
+    }
+    if (op1->getSize() != op2->getSize())
+        return false;
+
+    if (op1->getSize() == 0)
+        return true;
+
+    auto it = op1->getBegin();
+    if (it == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return false;
+    }
+    IVector* vec = nullptr;
+    RC setVectorRC = it->getVectorCopy(vec);
+    if (setVectorRC != RC::SUCCESS){
+        delete it;
+        delete vec;
+        SendInfo(Set::_logger, setVectorRC);
+        return false;
+    }
+
+    do{
+        RC foundVectorRC = op2->findFirst(vec, n, tol);
+        if (foundVectorRC == RC::VECTOR_NOT_FOUND){
+            delete it;
+            delete vec;
+            return false;
+        }
+        if (foundVectorRC != RC::SUCCESS){
+            delete it;
+            delete vec;
+            SendInfo(Set::_logger, foundVectorRC);
+            return false;
+        }
+        RC nextItRC = it->next();
+        if (nextItRC != RC::SUCCESS && nextItRC != RC::INDEX_OUT_OF_BOUND){
+            delete it;
+            delete vec;
+            SendInfo(Set::_logger, nextItRC);
+            return false;
+        }
+        if (!it->isValid())
+            break;
+        RC setVectorCordRC = it->getVectorCoords(vec);
+        if (setVectorCordRC != RC::SUCCESS){
+            delete it;
+            delete vec;
+            SendInfo(Set::_logger, setVectorCordRC);
+            return false;
+        }
+    }while(true);
+
+    delete it;
+    delete vec;
+    return true;
 }
 
 LIB_EXPORT bool ISet::subSet(const ISet *const &op1, const ISet *const &op2, IVector::NORM n, double tol) {
-    return false;
+    if (op1 == nullptr || op2 == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return false;
+    }
+    if (std::isnan(tol) || std::isinf(tol) || tol <= 0.){
+        SendInfo(Set::_logger, RC::INVALID_ARGUMENT);
+        return false;
+    }
+    if (op1->getDim() != op2->getDim()){
+        SendInfo(Set::_logger, RC::MISMATCHING_DIMENSIONS);
+        return false;
+    }
+    if (op2->getSize() == 0)
+        return true;
+    if (op1->getDim() == 0)
+        return false;
+     auto it = op2->getBegin();
+     if (it == nullptr){
+         SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+         return false;
+     }
+     IVector* vec = nullptr;
+     RC setVectorRC = it->getVectorCopy(vec);
+     if (setVectorRC != RC::SUCCESS) {
+         delete it;
+         delete vec;
+         SendInfo(Set::_logger, setVectorRC);
+         return false;
+     }
+
+     do{
+         RC foundVectorRC = op1->findFirst(vec, n, tol);
+         if (foundVectorRC == RC::VECTOR_NOT_FOUND){
+             delete it;
+             delete vec;
+             return false;
+         }
+         if (foundVectorRC != RC::SUCCESS){
+             delete it;
+             delete vec;
+             SendInfo(Set::_logger, foundVectorRC);
+             return false;
+         }
+         RC nextRC = it->next();
+         if (nextRC != RC::SUCCESS && nextRC != RC::INDEX_OUT_OF_BOUND){
+             delete it;
+             delete vec;
+             SendInfo(Set::_logger, nextRC);
+             return false;
+         }
+         if (!it->isValid())
+             break;
+         RC setVectorCordRC = it->getVectorCoords(vec);
+         if (setVectorCordRC != RC::SUCCESS){
+             delete it;
+             delete vec;
+             SendInfo(Set::_logger, setVectorCordRC);
+             return false;
+         }
+     }while(true);
+
+     delete it;
+     delete vec;
+    return true;
 }
 
 ISet::~ISet() = default;
@@ -626,7 +940,7 @@ RC Set::insert(const IVector *const &val, IVector::NORM n, double tol) {
     }
 
     if (_size >= _capacity){
-        auto* tmpData = new(std::nothrow) double[_capacity * capacityGain];
+        auto* tmpData = new(std::nothrow) double[_capacity * capacityGain * _dim];
         auto* tmpHash = new(std::nothrow) size_t[_capacity * capacityGain];
         if (tmpHash == nullptr || tmpData == nullptr){
             delete [] tmpData;
@@ -764,7 +1078,18 @@ RC Set::findFirstAndCopy(const IVector *const &pat, IVector::NORM n, double tol,
 }
 
 ISet *Set::clone() const {
-    return nullptr;
+    auto setClone = new(std::nothrow) Set();
+    setClone->_data = new double[_capacity * _dim ];
+    setClone->_hashCodes = new size_t[_capacity];
+    std::memcpy(setClone->_data, _data, _size * _dim * sizeof (double));
+    for (size_t hash = 0; hash < _size; hash++)
+        setClone->_hashCodes[hash] = hash;
+    setClone->_size = _size;
+    setClone->_dim = _dim;
+    setClone->_capacity = _capacity;
+    setClone->_nextHash = _size;
+
+    return setClone;
 }
 
 RC Set::findFirst(const IVector *const &pat, IVector::NORM n, double tol) const {
@@ -799,6 +1124,7 @@ RC Set::findFirst(const IVector *const &pat, IVector::NORM n, double tol) const 
         }
     }while(i <= _size);
 
+    delete it;
     return RC::VECTOR_NOT_FOUND;
 }
 

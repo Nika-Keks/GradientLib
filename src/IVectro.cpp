@@ -56,8 +56,6 @@ namespace
     ILogger* Vector::logger = nullptr;
 };
 
-
-
 Vector::Vector(size_t dim):
         _dim(dim)
 {
