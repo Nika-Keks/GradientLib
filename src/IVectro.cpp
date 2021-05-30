@@ -27,7 +27,6 @@ namespace
         static double distSecondNorm(size_t dim, double const* dataOp1, double const* dataOp2 = nullptr);
         static double distInfinityNorm(size_t dim, double const* dataOp1, double const* dataOp2 = nullptr);
         static void log(RC code, ILogger::Level level, const char* const& srcfile, const char* const& function, int line);
-///IAA: Вы хорошо тестировали?
         static IVector* applyOperator(IVector const* const& op1, IVector const* const& op2, std::function<double(double, double)> fun);
 
         IVector* clone() const override;
@@ -50,7 +49,7 @@ namespace
 
         static RC setLoggerImpl(ILogger* const logger);
 
-        ILogger* getLogger() const override;
+        static ILogger* getLoggerImpl();
     };
 
     ILogger* Vector::logger = nullptr;
@@ -703,13 +702,17 @@ RC Vector::setData(size_t dim, const double *const &ptr_data) {
     return RC::SUCCESS;
 }
 
-ILogger *Vector::getLogger() const {
+ILogger *Vector::getLoggerImpl() {
     return logger;
 }
 
 RC IVector::setLogger(ILogger* const logger)
 {
     return Vector::setLoggerImpl(logger);
+}
+
+ILogger* IVector::getLogger() {
+    return Vector::getLoggerImpl();
 }
 
 IVector::~IVector(){}
