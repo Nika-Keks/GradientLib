@@ -7,11 +7,18 @@ void testIVector();
 
 void testISet();
 
+namespace comp{
+    void testICompact();
+}
+
+
 int main()
 {
     //testIVector();
 
-    testISet();
+    //testISet();
+
+    comp::testICompact();
 
     return 0;
 }

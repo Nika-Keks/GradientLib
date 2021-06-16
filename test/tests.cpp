@@ -4,6 +4,7 @@
 #include "../include/IVector.h"
 #include "../include/ILogger.h"
 #include "../include/ISet.h"
+#include "../include/ICompact.h"
 
 #define epsilon 1e-8
 
@@ -182,3 +183,97 @@ void testISet(){
     delete set2;
 }
 
+
+namespace comp {
+    double const
+    e11[] = {1, 1},
+    e01[] = {-1, 1},
+    e00[] = {-1, -1},
+    e10[] = {1, -1},
+    e0[]   = {0, 0, 0},
+    e12[]  = {1./2, 1./2},
+    e22[]  = {-1./2, -1./2};
+
+    size_t const dim = 2;
+    size_t const gridArr[] = {1, 1};
+
+    size_t const orderArr[] = {0, 1};
+
+    void printCompact(ICompact const * const& com, IMultiIndex const * const& order){
+        if (com == nullptr){
+            std::cout << "comp in null" << std::endl;
+            return;
+        }
+        auto it = com->getBegin(order);
+        if (it == nullptr){
+            std::cout << "it in null" << std::endl;
+            return;
+        }
+        while (it->isValid()){
+            IVector* vec;
+            it->getVectorCopy(vec);
+            if (vec == nullptr){
+                std::cout << "vec is null" << std::endl;
+                return;
+            }
+            printVector(vec);
+            delete vec;
+            vec = nullptr;
+            it->next();
+        }
+        delete it;
+        std::cout << std::endl;
+    }
+
+
+
+    void testICompact() {
+        auto v11 = IVector::createVector(dim, e11);
+        auto v01 = IVector::createVector(dim, e01);
+        auto v00 = IVector::createVector(dim, e00);
+        auto v10 = IVector::createVector(dim, e10);
+        auto v0   = IVector::createVector(dim, e0);
+        auto v12  = IVector::createVector(dim, e12);
+        auto v22  = IVector::createVector(dim, e22);
+        auto grid = IMultiIndex::createMultiIndex(dim, gridArr);
+        auto order = IMultiIndex::createMultiIndex(dim, orderArr);
+
+        auto com11 = ICompact::createCompact(v11, v0, grid);
+        auto com01 = ICompact::createCompact(v01, v0, grid);
+        auto com00 = ICompact::createCompact(v00, v0, grid);
+        auto com10 = ICompact::createCompact(v10, v0, grid);
+        auto com0 = ICompact::createCompact(v12, v22, grid);
+
+        auto v2 = IVector::add(v11, v11);
+        auto comRemote = ICompact::createCompact(v2, v11, grid);
+        //printCompact(ICompact::createCompactSpan(com00, com0, grid), order);
+
+        //printCompact(ICompact::createCompactSpan(com10, com01, grid), order);
+
+        printCompact(comRemote, order);
+        printCompact(com00, order);
+
+        //printCompact(ICompact::createIntersection(com0, com11, grid, epsilon), order);
+        auto resCom = ICompact::createIntersection(com00, comRemote, grid, 2.);
+        printCompact(resCom, order);
+
+        delete resCom;
+        delete v11;
+        delete v01;
+        delete v00;
+        delete v10;
+        delete v0;
+        delete v12;
+        delete v22;
+        delete grid;
+        delete order;
+        delete com0;
+        delete com11;
+        delete com01;
+        delete com00;
+        delete com10;
+        delete v2;
+        delete comRemote;
+    }
+
+}

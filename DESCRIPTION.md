@@ -4,7 +4,7 @@
 
 Для того чтобы можно было использовать функции динамической библиотеки, нужно пометить их соответствующим атрибутом при компиляции.
 
-Эта операция выполняется автоматически при сборке проекта если указать флаг `-DBUILD_INTERFACES`. Этот флаг определяет макрос `BUILD_INTERFACES`, наличие которого сигнализирует о сборке библиотеки. За это автоматическое действие отвечает [этот заголовочный файл](https://github.com/ThinkingFrog/IVector/blob/main/include/Interfacedllexport.h).
+Эта операция выполняется автоматически при сборке проекта если указать флаг `-DBUILD_INTERFACES`. Этот флаг определяет макрос `BUILD_INTERFACES`, наличие которого сигнализирует о сборке библиотеки. За это автоматическое действие отвечает [этот заголовочный файл](https://github.comp/ThinkingFrog/IVector/blob/main/include/Interfacedllexport.h).
 
 В `Code::Blocks` это можно сделать с помощью настроек проекта: `Project -> Build options -> Compiler settings -> #defines`.
 
@@ -14,8 +14,8 @@
 
 ## <a name="logger"></a>ILogger
 
-[Интерфейс для логгера](https://github.com/ThinkingFrog/IVector/blob/main/include/ILogger.h). Используется для протоколирования действий и ошибок.
-Связанный с ним [класс ошибок](https://github.com/ThinkingFrog/IVector/blob/main/include/RC.h).
+[Интерфейс для логгера](https://github.comp/ThinkingFrog/IVector/blob/main/include/ILogger.h). Используется для протоколирования действий и ошибок.
+Связанный с ним [класс ошибок](https://github.comp/ThinkingFrog/IVector/blob/main/include/RC.h).
 
 ### Описание интерфейса
 
@@ -85,7 +85,7 @@
 
 ## IVector
 
-[Интерфейс для вектора](https://github.com/ThinkingFrog/IVector/blob/main/include/IVector.h) - элемент n-мерного евклидова пространства.
+[Интерфейс для вектора](https://github.comp/ThinkingFrog/IVector/blob/main/include/IVector.h) - элемент n-мерного евклидова пространства.
 
 ### Аксиомы типа:
 - элементы - `double` - не могут быть NaN, Inf, -Inf
@@ -219,7 +219,7 @@ __Факт того, что тип реализует операции `copyInst
 
 ## ISet
 
-[Интерфейс для контейнера - множество векторов](https://github.com/ThinkingFrog/IVector/blob/main/include/ISet.h), которые хранятся в хронологической последовательности. Множество хранит вектора одной размерности, которая определяется первым вектором переданным на хранение.
+[Интерфейс для контейнера - множество векторов](https://github.comp/ThinkingFrog/IVector/blob/main/include/ISet.h), которые хранятся в хронологической последовательности. Множество хранит вектора одной размерности, которая определяется первым вектором переданным на хранение.
 
 ### Описание интерфейса:
 
@@ -430,7 +430,7 @@ __Факт того, что тип реализует операции `copyInst
 
 ## Контрольный блок: `ISetControlBlock`
 
-[Интерфейс контрольного блока](https://github.com/ThinkingFrog/IVector/blob/main/include/ISetControlBlock.h).
+[Интерфейс контрольного блока](https://github.comp/ThinkingFrog/IVector/blob/main/include/ISetControlBlock.h).
 
 ### Описание интерфейса контрольного блока:
 
@@ -460,9 +460,9 @@ __Факт того, что тип реализует операции `copyInst
 
 ## ICompact
 
-[Интерфейс для n-мерного замкнутого параллелепипеда - компакта](https://github.com/ThinkingFrog/IVector/blob/main/include/ICompact.h) в n-мерном евклидовом пространстве.
+[Интерфейс для n-мерного замкнутого параллелепипеда - компакта](https://github.comp/ThinkingFrog/IVector/blob/main/include/ICompact.h) в n-мерном евклидовом пространстве.
 
-Фактически представляет собой сетку, которая заданна двумя векторами, содержащими информацию о границах параллелепипеда, и вектором с целочисленными компонентами ([Мультииндекс](https://github.com/ThinkingFrog/IVector/blob/main/include/IMultiIndex.h)), который задаёт число разбиений сетки по каждой оси.
+Фактически представляет собой сетку, которая заданна двумя векторами, содержащими информацию о границах параллелепипеда, и вектором с целочисленными компонентами ([Мультииндекс](https://github.comp/ThinkingFrog/IVector/blob/main/include/IMultiIndex.h)), который задаёт число разбиений сетки по каждой оси.
 
 ### Замечания по интерфейсу:
 - получение ресурса аналогично `ISet`: имеется 2 варианта по семантике получения ресурса
@@ -472,7 +472,7 @@ __Факт того, что тип реализует операции `copyInst
 
 ## IProblem, IDiffProblem
 
-[Интерфейс целевой функции](https://github.com/ThinkingFrog/IVector/blob/main/include/IProblem.h) и [дифференцируемой целевой функции](https://github.com/ThinkingFrog/IVector/blob/main/include/IDiffProblem.h).
+[Интерфейс целевой функции](https://github.comp/ThinkingFrog/IVector/blob/main/include/IProblem.h) и [дифференцируемой целевой функции](https://github.comp/ThinkingFrog/IVector/blob/main/include/IDiffProblem.h).
 
 Определяется двумя компактами: область определения аргумента и подмножество параметрического пространства.
 
