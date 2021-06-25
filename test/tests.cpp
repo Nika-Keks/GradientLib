@@ -1,4 +1,4 @@
-#include <windows.h>
+//#include <windows.h>
 #include <iostream>
 #include <cmath>
 #include <vector>
@@ -297,14 +297,14 @@ namespace comp {
 
         auto v2 = IVector::add(v11, v11);
         auto comRemote = ICompact::createCompact(v2, v11, grid);
-        //printCompact(ICompact::createCompactSpan(com00, com0, grid), order);
+        printCompact(ICompact::createCompactSpan(com00, com0, grid), order);
 
-        //printCompact(ICompact::createCompactSpan(com10, com01, grid), order);
+        printCompact(ICompact::createCompactSpan(com10, com01, grid), order);
 
         printCompact(comRemote, order);
         printCompact(com00, order);
 
-        //printCompact(ICompact::createIntersection(com0, com11, grid, epsilon), order);
+        printCompact(ICompact::createIntersection(com0, com11, grid, epsilon), order);
         auto resCom = ICompact::createIntersection(com00, comRemote, grid, 2.);
         printCompact(resCom, order);
 
@@ -339,7 +339,7 @@ namespace prob{
     size_t const gridIndex[] = {2, 2};
     size_t const orderIndex[] = {0, 1};
 
-    IBroker* loadBroker(HINSTANCE& problemModule){
+    /*IBroker* loadBroker(HINSTANCE& problemModule){
         problemModule = LoadLibraryA("IProblem.dll");
         if (problemModule == NULL){
             std::cout << "problem load error" <<  std::endl;
@@ -361,7 +361,7 @@ namespace prob{
             return nullptr;
         }
         return broker;
-    }
+    }*/
 
     void testEval(IProblem* problem){
         auto args = IVector::createVector(dim, e11);
@@ -380,13 +380,17 @@ namespace prob{
             std::cout << "it in null" << std::endl;
             return;
         }
+        std::cout << "params: ";
+        printVector(params);
         while (it->isValid()){
             IVector* vec;
             it->getVectorCopy(vec);
             if (vec == nullptr){
                 std::cout << "nA n" << std::endl;
             }else{
-                std::cout << problem->evalByArgs(vec) << std::endl;
+                std::cout << "arg: ";
+                printVector(vec);
+                std::cout << "eval: " << problem->evalByArgs(vec) << std::endl << std::endl;
             }
 
             delete vec;
@@ -398,7 +402,7 @@ namespace prob{
     }
 
     void testIProblem(){
-        HINSTANCE problemModule = NULL;
+        /*HINSTANCE problemModule = NULL;
         IBroker* broker = loadBroker(problemModule);
         if (broker == nullptr)
             return;
@@ -416,8 +420,8 @@ namespace prob{
             FreeLibrary(problemModule);
             broker->release();
             return;
-        }
-
+        }*/
+        auto problem = IProblem::createProblem();
         testEval(problem);
     }
 }

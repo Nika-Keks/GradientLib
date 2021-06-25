@@ -732,7 +732,7 @@ bool Compact::isInside(const IVector *const &vec) const {
         return false;
     }
     RC isInsideRC = RC::SUCCESS;
-    if (vectorME(_lBorder, vec, isInsideRC) && vectorLE(vec, _rBorder, isInsideRC)){
+    if (vectorLE(_lBorder, vec, isInsideRC) && vectorME(_rBorder, vec, isInsideRC)){
         if (isInsideRC != RC::SUCCESS){
             SendInfo(_logger, isInsideRC);
             return false;

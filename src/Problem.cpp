@@ -5,7 +5,7 @@
 
 #define SendInfo(Logger, Code) if (Logger != nullptr) Logger->info((Code), __FILE__, __func__, __LINE__)
 #define PARAM_SPACE_DIM 2
-#define ARGS_SPACE_DIM 3
+#define ARGS_SPACE_DIM 2
 
 
 inline void vectorIsValid(IVector const * const& vec, ICompact const * const& space, RC& result){
@@ -15,7 +15,7 @@ inline void vectorIsValid(IVector const * const& vec, ICompact const * const& sp
         result = RC::NULLPTR_ERROR;
     else if (space->getDim() != vec->getDim())
         result = RC::MISMATCHING_DIMENSIONS;
-    else if (space->isInside(vec))
+    else if (!space->isInside(vec))
         result = RC::INVALID_ARGUMENT;
 }
 
