@@ -1,7 +1,7 @@
 #include "IBroker.h"
 #include "IProblem.h"
 #include "Interfacedllexport.h"
-
+/*
 namespace {
     class BrokerImpl : public IBroker {
     private:
@@ -36,7 +36,7 @@ extern "C" {
         return (void*) BrokerImpl::instance();
     }
 }
-
+*/
 /*
 APP
 

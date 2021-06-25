@@ -13,17 +13,13 @@
 
 
 namespace{
+    class Set;
+
     class SetControlBlock : public ISetControlBlock{
     private:
         static ILogger * _logger;
-        size_t const* const* _hashCodesPtr;
-        double const* const* _dataPtr;
-        ISet* _set;
+        Set const* _set;
         bool* _setIsValid;
-
-        inline void vectorIsValid(IVector const* const& vec, RC& rc, const char* const& srcfile, const char* const& function, int line) const;
-
-        static inline void indexIncIsValid(size_t indexInc, RC& rc, const char* const& srcfile, const char* const& function, int line) ;
 
     public:
 
@@ -37,152 +33,13 @@ namespace{
 
         ~SetControlBlock() override;
 
-        SetControlBlock(ISet* set, size_t const * const * const& hashCodesPtr, double const * const * const& dataPtr, bool* setIsValid);
+        SetControlBlock(Set const *set, bool *setIsValid);
     };
 
     ILogger* SetControlBlock::_logger = nullptr;
-}
-
-RC SetControlBlock::getNext(IVector *const &vec, size_t &index, size_t indexInc) const {
-    if (!(*_setIsValid))
-        return RC::SOURCE_SET_DESTROYED;
-    if ( _set->getSize() == 0)
-        return RC::SOURCE_SET_EMPTY;
-
-    RC validArgumentsRC = RC::SUCCESS;
-    vectorIsValid(vec, validArgumentsRC, __FILE__, __FUNCTION__ , __LINE__);
-    indexIncIsValid(indexInc, validArgumentsRC, __FILE__, __FUNCTION__, __LINE__);
-    if (validArgumentsRC != RC::SUCCESS)
-        return validArgumentsRC;
-
-    for (size_t i = 0; i < _set->getSize() ; i++)
-        if (index < (*_hashCodesPtr)[i]){
-            if (i + indexInc - 1 >= _set->getSize()){
-                SendInfo(_logger, RC::INDEX_OUT_OF_BOUND);
-                return RC::INDEX_OUT_OF_BOUND;
-            }
-            RC setDataRC = vec->setData(_set->getDim(), (*_dataPtr) + (i + indexInc - 1) * _set->getDim());
-            if (setDataRC != RC::SUCCESS){
-                SendInfo(_logger, setDataRC);
-                return setDataRC;
-            }
-            index = (*_hashCodesPtr)[i + indexInc - 1];
-            return RC::SUCCESS;
-        }
-    return RC::INDEX_OUT_OF_BOUND;
-}
-
-RC SetControlBlock::getPrevious(IVector *const &vec, size_t &index, size_t indexInc) const {
-    if (!(*_setIsValid))
-        return RC::SOURCE_SET_DESTROYED;
-    if ( _set->getSize() == 0)
-        return RC::SOURCE_SET_EMPTY;
-
-    RC validArgumentsRC = RC::SUCCESS;
-    vectorIsValid(vec, validArgumentsRC, __FILE__, __FUNCTION__ , __LINE__);
-    indexIncIsValid(indexInc, validArgumentsRC, __FILE__, __FUNCTION__, __LINE__);
-    if (validArgumentsRC != RC::SUCCESS)
-        return validArgumentsRC;
-
-    for (size_t i = 0; i < _set->getSize(); i++)
-        if (index > (*_hashCodesPtr)[_set->getSize() - 1 - i]) {
-            size_t newIndex = _set->getSize() - 1 - i;
-            if (newIndex - 1 + indexInc >= _set->getSize()){
-                SendInfo(_logger, RC::INDEX_OUT_OF_BOUND);
-                return RC::INDEX_OUT_OF_BOUND;
-            }
-            RC setDataRC = vec->setData(_set->getDim(), (*_dataPtr) + (newIndex - 1 + indexInc) * _set->getDim());
-            if (setDataRC != RC::SUCCESS){
-                SendInfo(_logger, setDataRC);
-                return setDataRC;
-            }
-            index = (*_hashCodesPtr)[newIndex - 1 + indexInc];
-            return RC::SUCCESS;
-        }
-    return RC::INDEX_OUT_OF_BOUND;
-}
-
-RC SetControlBlock::getBegin(IVector *const &vec, size_t &index) const {
-    if (!(*_setIsValid))
-        return RC::SOURCE_SET_DESTROYED;
-    if ( _set->getSize() == 0)
-        return RC::SOURCE_SET_EMPTY;
-
-    RC validArgumentsRC = RC::SUCCESS;
-    vectorIsValid(vec, validArgumentsRC, __FILE__, __FUNCTION__ , __LINE__);
-    if (validArgumentsRC != RC::SUCCESS)
-        return validArgumentsRC;
-
-    RC setDataRC = vec->setData(_set->getDim(), (*_dataPtr));
-    if (setDataRC != RC::SUCCESS){
-        SendInfo(_logger, setDataRC);
-        return setDataRC;
-    }
-    index = (*_hashCodesPtr)[0];
-    return RC::SUCCESS;
-}
-
-RC SetControlBlock::getEnd(IVector *const &vec, size_t &index) const {
-    if (!(*_setIsValid))
-        return RC::SOURCE_SET_DESTROYED;
-    if ( _set->getSize() == 0)
-        return RC::SOURCE_SET_EMPTY;
-
-    RC validArgumentsRC = RC::SUCCESS;
-    vectorIsValid(vec, validArgumentsRC, __FILE__, __FUNCTION__ , __LINE__);
-    if (validArgumentsRC != RC::SUCCESS)
-        return validArgumentsRC;
-
-    RC setDataRC = vec->setData(_set->getDim(), (*_dataPtr) + (_set->getSize() - 1) * _set->getDim());
-    if (setDataRC != RC::SUCCESS){
-        SendInfo(_logger, setDataRC);
-        return setDataRC;
-    }
-    index = (*_hashCodesPtr)[_set->getSize() - 1];
-    return RC::SUCCESS;
-}
-
-SetControlBlock::~SetControlBlock(){
-    delete [] _setIsValid;
-}
-
-SetControlBlock::SetControlBlock(ISet *set, const size_t *const *const &hashCodesPtr,
-                                 const double *const *const &dataPtr, bool* setIsValid) :
-        _set(set),
-        _hashCodesPtr(hashCodesPtr),
-        _dataPtr(dataPtr),
-        _setIsValid(setIsValid)
-{}
-
-void SetControlBlock::vectorIsValid(const IVector *const &vec, RC &rc, const char *const &srcfile,
-                                    const char *const &function, int line) const{
-    if (vec == nullptr){
-        rc = RC::NULLPTR_ERROR;
-        if (_logger != nullptr)
-            _logger->log(RC::NULLPTR_ERROR, ILogger::Level::INFO, srcfile, function, line);
-        return;
-    }
-    if (vec->getDim() != _set->getDim()){
-        rc = RC::MISMATCHING_DIMENSIONS;
-        if (_logger != nullptr)
-            _logger->log(RC::MISMATCHING_DIMENSIONS, ILogger::Level::INFO, srcfile, function, line);
-    }
-}
-
-void SetControlBlock::indexIncIsValid(size_t indexInc, RC &rc, const char *const &srcfile, const char *const &function,
-                                      int line) {
-    if (indexInc == 0){
-        rc = RC::INVALID_ARGUMENT;
-        if (_logger != nullptr)
-            _logger->log(RC::INVALID_ARGUMENT, ILogger::Level::INFO, srcfile, function, line);
-    }
-}
 
 
-ISetControlBlock::~ISetControlBlock() = default;
 
-
-namespace {
     class Iterator : public ISet::IIterator{
     private:
         static ILogger * _logger;
@@ -224,7 +81,110 @@ namespace {
     };
 
     ILogger* Iterator::_logger = nullptr;
+
+    class Set : public ISet
+    {
+    private:
+        size_t _dim;
+        size_t _size;
+        size_t _capacity;
+        double* _data;
+        size_t* _hashCodes;
+        size_t _nextHash;
+        std::shared_ptr<ISetControlBlock> _setCB;
+        bool* _setIsValid;
+
+    public:
+
+        Set();
+
+        ~Set() override;
+
+        ISet* clone() const override;
+
+        size_t getDim() const override;
+
+        size_t getSize() const override;
+
+        RC getCopy(size_t index, IVector *& val) const override;
+
+        RC findFirstAndCopy(IVector const * const& pat, IVector::NORM n, double tol, IVector *& val) const override;
+
+        RC getCoords(size_t index, IVector * const& val) const override;
+
+        RC findFirstAndCopyCoords(IVector const * const& pat, IVector::NORM n, double tol, IVector * const& val) const override;
+
+        RC findFirst(IVector const * const& pat, IVector::NORM n, double tol) const override;
+
+        RC insert(IVector const * const& val, IVector::NORM n, double tol) override;
+
+        RC remove(size_t index) override;
+
+        RC remove(IVector const * const& pat, IVector::NORM n, double tol) override;
+
+        IIterator *getIterator(size_t index) const override;
+
+        IIterator *getBegin() const override;
+
+        IIterator *getEnd() const override;
+
+        RC getNext(IVector *const &vec, size_t &index, size_t indexInc) const;
+
+        RC getPrevious(IVector *const &vec, size_t &index, size_t indexInc) const;
+
+        RC getBegin(IVector *const &vec, size_t &index) const;
+
+        RC getEnd(IVector *const &vec, size_t &index) const;
+
+        inline static void log(RC code, ILogger::Level level, const char* const& srcfile, const char* const& function, int line);
+
+        inline void vectorIsValid(IVector const* const& vec, RC& rc, const char* const& srcfile, const char* const& function, int line) const;
+
+        inline void indexIsValid(size_t index, RC& rc, const char* const& srcfile, const char* const& function, int line) const;
+
+        static ILogger* _logger;
+    };
+
+    ILogger* Set::_logger = nullptr;
+    size_t const capacityGain = 2;
+    size_t const startCapacity = 2;
 }
+
+RC SetControlBlock::getNext(IVector *const &vec, size_t &index, size_t indexInc) const {
+    if (!(*_setIsValid))
+        return RC::SOURCE_SET_DESTROYED;
+    return _set->getNext(vec, index, indexInc);
+}
+
+RC SetControlBlock::getPrevious(IVector *const &vec, size_t &index, size_t indexInc) const {
+    if (!(*_setIsValid))
+        return RC::SOURCE_SET_DESTROYED;
+    return _set->getPrevious(vec, index, indexInc);
+}
+
+RC SetControlBlock::getBegin(IVector *const &vec, size_t &index) const {
+    if (!(*_setIsValid))
+        return RC::SOURCE_SET_DESTROYED;
+    return _set->getBegin(vec, index);
+}
+
+RC SetControlBlock::getEnd(IVector *const &vec, size_t &index) const {
+    if (!(*_setIsValid))
+        return RC::SOURCE_SET_DESTROYED;
+    return _set->getEnd(vec, index);
+}
+
+SetControlBlock::~SetControlBlock(){
+    delete [] _setIsValid;
+}
+
+SetControlBlock::SetControlBlock(Set const *set, bool *setIsValid) :
+        _set(set),
+        _setIsValid(setIsValid)
+{}
+
+ISetControlBlock::~ISetControlBlock() = default;
+
 
 ISet::IIterator *Iterator::getNext(size_t indexInc) const {
     auto it = clone();
@@ -383,73 +343,18 @@ RC ISet::IIterator::setLogger(ILogger *const pLogger) {
 
 
 
-namespace
-{
-
-    class Set : public ISet
-    {
-    private:
-        size_t _dim;
-        size_t _size;
-        size_t _capacity;
-        double* _data;
-        size_t* _hashCodes;
-        size_t _nextHash;
-        std::shared_ptr<ISetControlBlock> _setCB;
-        bool* _setIsValid;
-
-    public:
-
-        Set();
-
-        ~Set() override;
-
-        ISet* clone() const override;
-
-        size_t getDim() const override;
-
-        size_t getSize() const override;
-
-        RC getCopy(size_t index, IVector *& val) const override;
-
-        RC findFirstAndCopy(IVector const * const& pat, IVector::NORM n, double tol, IVector *& val) const override;
-
-        RC getCoords(size_t index, IVector * const& val) const override;
-
-        RC findFirstAndCopyCoords(IVector const * const& pat, IVector::NORM n, double tol, IVector * const& val) const override;
-
-        RC findFirst(IVector const * const& pat, IVector::NORM n, double tol) const override;
-
-        RC insert(IVector const * const& val, IVector::NORM n, double tol) override;
-
-        RC remove(size_t index) override;
-
-        RC remove(IVector const * const& pat, IVector::NORM n, double tol) override;
-
-        IIterator *getIterator(size_t index) const override;
-
-        IIterator *getBegin() const override;
-
-        IIterator *getEnd() const override;
-
-        static RC setLogger(ILogger* const);
-
-        inline static void log(RC code, ILogger::Level level, const char* const& srcfile, const char* const& function, int line);
-
-        inline void vectorIsValid(IVector const* const& vec, RC& rc, const char* const& srcfile, const char* const& function, int line) const;
-
-        inline void indexIsValid(size_t index, RC& rc, const char* const& srcfile, const char* const& function, int line) const;
-
-        static ILogger* _logger;
-    };
-
-    ILogger* Set::_logger = nullptr;
-    size_t const capacityGain = 2;
-    size_t const startCapacity = 2;
-}
 
 LIB_EXPORT RC ISet::setLogger(ILogger *const logger) {
-    return Set::setLogger(logger);
+    if (logger == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return RC::NULLPTR_ERROR;
+    }
+    Set::_logger = logger;
+    return RC::SUCCESS;
+}
+
+LIB_EXPORT ILogger* ISet::getLogger(){
+    return Set::_logger;
 }
 
 LIB_EXPORT ISet *ISet::createSet() {
@@ -775,53 +680,53 @@ LIB_EXPORT bool ISet::subSet(const ISet *const &op1, const ISet *const &op2, IVe
         return true;
     if (op1->getDim() == 0)
         return false;
-     auto it = op2->getBegin();
-     if (it == nullptr){
-         SendInfo(Set::_logger, RC::NULLPTR_ERROR);
-         return false;
-     }
-     IVector* vec = nullptr;
-     RC setVectorRC = it->getVectorCopy(vec);
-     if (setVectorRC != RC::SUCCESS) {
-         delete it;
-         delete vec;
-         SendInfo(Set::_logger, setVectorRC);
-         return false;
-     }
+    auto it = op2->getBegin();
+    if (it == nullptr){
+        SendInfo(Set::_logger, RC::NULLPTR_ERROR);
+        return false;
+    }
+    IVector* vec = nullptr;
+    RC setVectorRC = it->getVectorCopy(vec);
+    if (setVectorRC != RC::SUCCESS) {
+        delete it;
+        delete vec;
+        SendInfo(Set::_logger, setVectorRC);
+        return false;
+    }
 
-     do{
-         RC foundVectorRC = op1->findFirst(vec, n, tol);
-         if (foundVectorRC == RC::VECTOR_NOT_FOUND){
-             delete it;
-             delete vec;
-             return false;
-         }
-         if (foundVectorRC != RC::SUCCESS){
-             delete it;
-             delete vec;
-             SendInfo(Set::_logger, foundVectorRC);
-             return false;
-         }
-         RC nextRC = it->next();
-         if (nextRC != RC::SUCCESS && nextRC != RC::INDEX_OUT_OF_BOUND){
-             delete it;
-             delete vec;
-             SendInfo(Set::_logger, nextRC);
-             return false;
-         }
-         if (!it->isValid())
-             break;
-         RC setVectorCordRC = it->getVectorCoords(vec);
-         if (setVectorCordRC != RC::SUCCESS){
-             delete it;
-             delete vec;
-             SendInfo(Set::_logger, setVectorCordRC);
-             return false;
-         }
-     }while(true);
+    do{
+        RC foundVectorRC = op1->findFirst(vec, n, tol);
+        if (foundVectorRC == RC::VECTOR_NOT_FOUND){
+            delete it;
+            delete vec;
+            return false;
+        }
+        if (foundVectorRC != RC::SUCCESS){
+            delete it;
+            delete vec;
+            SendInfo(Set::_logger, foundVectorRC);
+            return false;
+        }
+        RC nextRC = it->next();
+        if (nextRC != RC::SUCCESS && nextRC != RC::INDEX_OUT_OF_BOUND){
+            delete it;
+            delete vec;
+            SendInfo(Set::_logger, nextRC);
+            return false;
+        }
+        if (!it->isValid())
+            break;
+        RC setVectorCordRC = it->getVectorCoords(vec);
+        if (setVectorCordRC != RC::SUCCESS){
+            delete it;
+            delete vec;
+            SendInfo(Set::_logger, setVectorCordRC);
+            return false;
+        }
+    }while(true);
 
-     delete it;
-     delete vec;
+    delete it;
+    delete vec;
     return true;
 }
 
@@ -835,7 +740,10 @@ Set::Set() :
         _hashCodes(nullptr),
         _nextHash(0){
     _setIsValid = new(std::nothrow) bool[1]{true};
-    _setCB = std::shared_ptr<ISetControlBlock>(new(std::nothrow) SetControlBlock(this, &_hashCodes, &_data, _setIsValid));
+///IAA: вот Ваша идея предоставить setCB доступ к приватному массиву владеющего им Set'а - это потенциальная дыра.
+///даже если Вы предоставляете его как const. Эта архитектура не выживет, если нужно будет переносить ее в многопоточное приложение,
+///т.е. когда сам Set должен жить в одном потоке, а его итераторы могут оказаться в других потоках
+    _setCB = std::shared_ptr<ISetControlBlock>(new(std::nothrow) SetControlBlock(this, _setIsValid));
 }
 
 Set::~Set() {
@@ -1019,13 +927,6 @@ RC Set::remove(const IVector *const &pat, IVector::NORM n, double tol) {
     return RC::VECTOR_NOT_FOUND;
 }
 
-RC Set::setLogger(ILogger *const logger) {
-    if (logger == nullptr)
-        return RC::NULLPTR_ERROR;
-    Set::_logger = logger;
-    return RC::SUCCESS;
-}
-
 RC Set::getCopy(size_t index, IVector *&val) const {
     RC argsIsValidRC = RC::SUCCESS;
     indexIsValid(index, argsIsValidRC, __FILE__, __FUNCTION__, __LINE__);
@@ -1174,6 +1075,103 @@ void Set::indexIsValid(size_t index, RC &rc, const char* const& srcfile, const c
         Set::log(RC::INDEX_OUT_OF_BOUND, ILogger::Level::INFO, srcfile, function, line);
         rc = RC::INDEX_OUT_OF_BOUND;
     }
+}
+
+RC Set::getNext(IVector *const &vec, size_t &index, size_t indexInc) const {
+    if (_size == 0)
+        return RC::SOURCE_SET_EMPTY;
+
+    RC validArgumentsRC = RC::SUCCESS;
+    vectorIsValid(vec, validArgumentsRC, __FILE__, __FUNCTION__ , __LINE__);
+    if (indexInc == 0){
+        SendInfo(_logger, RC::INVALID_ARGUMENT);
+        validArgumentsRC = RC::INVALID_ARGUMENT;
+    }
+    if (validArgumentsRC != RC::SUCCESS)
+        return validArgumentsRC;
+
+    for (size_t i = 0; i < _size; i++)
+        if (index < _hashCodes[i]){
+            if (i + indexInc - 1 >= _size){
+                SendInfo(_logger, RC::INDEX_OUT_OF_BOUND);
+                return RC::INDEX_OUT_OF_BOUND;
+            }
+            RC setDataRC = vec->setData(_dim, _data + (i + indexInc - 1) * _dim);
+            if (setDataRC != RC::SUCCESS){
+                SendInfo(_logger, setDataRC);
+                return setDataRC;
+            }
+            index = _hashCodes[i + indexInc - 1];
+            return RC::SUCCESS;
+        }
+    return RC::INDEX_OUT_OF_BOUND;
+}
+
+RC Set::getPrevious(IVector *const &vec, size_t &index, size_t indexInc) const {
+    if ( _size == 0)
+        return RC::SOURCE_SET_EMPTY;
+
+    RC validArgumentsRC = RC::SUCCESS;
+    vectorIsValid(vec, validArgumentsRC, __FILE__, __FUNCTION__ , __LINE__);
+    if (indexInc == 0){
+        SendInfo(_logger, RC::INVALID_ARGUMENT);
+        validArgumentsRC = RC::INVALID_ARGUMENT;
+    }
+    if (validArgumentsRC != RC::SUCCESS)
+        return validArgumentsRC;
+
+    for (size_t i = 0; i < _size; i++)
+        if (index > _hashCodes[_size - 1 - i]) {
+            size_t newIndex = _size - 1 - i;
+            if (newIndex - 1 + indexInc >= _size){
+                SendInfo(_logger, RC::INDEX_OUT_OF_BOUND);
+                return RC::INDEX_OUT_OF_BOUND;
+            }
+            RC setDataRC = vec->setData(_dim, _data + (newIndex - 1 + indexInc) * _dim);
+            if (setDataRC != RC::SUCCESS){
+                SendInfo(_logger, setDataRC);
+                return setDataRC;
+            }
+            index = _hashCodes[newIndex - 1 + indexInc];
+            return RC::SUCCESS;
+        }
+    return RC::INDEX_OUT_OF_BOUND;
+}
+
+RC Set::getBegin(IVector *const &vec, size_t &index) const {
+    if ( _size == 0)
+        return RC::SOURCE_SET_EMPTY;
+
+    RC validArgumentsRC = RC::SUCCESS;
+    vectorIsValid(vec, validArgumentsRC, __FILE__, __FUNCTION__ , __LINE__);
+    if (validArgumentsRC != RC::SUCCESS)
+        return validArgumentsRC;
+
+    RC setDataRC = vec->setData(_dim, _data);
+    if (setDataRC != RC::SUCCESS){
+        SendInfo(_logger, setDataRC);
+        return setDataRC;
+    }
+    index = _hashCodes[0];
+    return RC::SUCCESS;
+}
+
+RC Set::getEnd(IVector *const &vec, size_t &index) const {
+    if ( _size == 0)
+        return RC::SOURCE_SET_EMPTY;
+
+    RC validArgumentsRC = RC::SUCCESS;
+    vectorIsValid(vec, validArgumentsRC, __FILE__, __FUNCTION__ , __LINE__);
+    if (validArgumentsRC != RC::SUCCESS)
+        return validArgumentsRC;
+
+    RC setDataRC = vec->setData(_dim, _data + (_size - 1) * _dim);
+    if (setDataRC != RC::SUCCESS){
+        SendInfo(_logger, setDataRC);
+        return setDataRC;
+    }
+    index = _hashCodes[_size - 1];
+    return RC::SUCCESS;
 }
 
 

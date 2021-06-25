@@ -155,6 +155,48 @@ void testSubSet(ISet const* set1, ISet const * set2){
     std::cout << ISet::subSet(set1, set2, IVector::NORM::SECOND, epsilon);
 }
 
+void testIterators(ISet const* const& set, ISet::IIterator* (ISet::*_getBegin)() const, RC (ISet::IIterator::*_next)(size_t)){
+    if (set == nullptr){
+        std::cout << "set == nullptr" << std::endl;
+        return;
+    }
+    auto it = (set->*_getBegin)();
+    if (it == nullptr){
+        std::cout << "it == nullptr" << std::endl;
+        return;
+    }
+    while (it->isValid()){
+        IVector* vec;
+        RC getVectorRC = it->getVectorCopy(vec);
+        if (getVectorRC != RC::SUCCESS){
+            std::cout << "getVectorCopy return " << static_cast<int>(getVectorRC) << std::endl;
+            delete vec;
+            delete it;
+            return;
+        }
+        printVector(vec);
+        delete vec;
+        vec = nullptr;
+        RC nextItRC = (it->*_next)(1);
+        if (nextItRC != RC::SUCCESS && nextItRC != RC::INDEX_OUT_OF_BOUND){
+            std::cout << "ISet::Iterator::next return " << static_cast<int>(nextItRC) << std::endl;;
+            delete vec;
+            delete it;
+            return;
+        }
+        delete vec;
+        vec = nullptr;
+    }
+    std::cout << "test passed" << std::endl << std::endl;
+    delete it;
+}
+
+void testIterators(ISet const* const& set){
+    testIterators(set, &ISet::getBegin, &ISet::IIterator::next);
+    testIterators(set, &ISet::getEnd, &ISet::IIterator::previous);
+}
+
+
 void testISet(){
     auto set1 = ISet::createSet();
     auto set2 = ISet::createSet();
@@ -167,15 +209,17 @@ void testISet(){
         testInsert(set2, dim, vectors[i]);
 
 
-    //testIntersection(set1, set2);
+    testIterators(set1);
 
-    //testUnion(set1, set2);
+    testIntersection(set1, set2);
 
-    //testSub(set1, set2);
+    testUnion(set1, set2);
 
-    //testSymSub(set1, set2);
+    testSub(set1, set2);
 
-    //testEquals(set1, set2);
+    testSymSub(set1, set2);
+
+    testEquals(set1, set2);
 
     testSubSet(set1, set1);
 
@@ -275,5 +319,4 @@ namespace comp {
         delete v2;
         delete comRemote;
     }
-
 }
