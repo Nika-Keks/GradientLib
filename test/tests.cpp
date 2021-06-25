@@ -1,3 +1,4 @@
+#include <windows.h>
 #include <iostream>
 #include <cmath>
 #include <vector>
@@ -5,9 +6,14 @@
 #include "../include/ILogger.h"
 #include "../include/ISet.h"
 #include "../include/ICompact.h"
+#include "../include/IBroker.h"
+#include "../include/IProblem.h"
 
 #define epsilon 1e-8
 
+#ifndef M_PI
+#define M_PI (3.14159265358979323846)
+#endif
 
 double const
         e1[] = { 1, 0, 0 },
@@ -19,8 +25,9 @@ double const
         v3[] = {3, 3, 3},
         v4[] = {4, 4, 4},
         v5[] = {5, 5, 5},
-        big[] = {0, 0, 0, 0},
-        small[] = {0, 0};
+        big[] = {0, 0, 0, 0};
+        //small[] = {0, 0};
+
 std::vector<double const*> vectors ={ zero, e1, e2, e3, v1, v2, v3, v4, v5 };
 size_t const dim = 3;
 
@@ -320,3 +327,98 @@ namespace comp {
         delete comRemote;
     }
 }
+
+namespace prob{
+
+    double const dim = 2;
+    double const
+    e11[] = {1., 1.,},
+    epipi[]= {M_PI, M_PI},
+    e55[] = {5., 5.},
+    em5m5[] = {-5., -5.};
+    size_t const gridIndex[] = {2, 2};
+    size_t const orderIndex[] = {0, 1};
+
+    IBroker* loadBroker(HINSTANCE& problemModule){
+        problemModule = LoadLibraryA("IProblem.dll");
+        if (problemModule == NULL){
+            std::cout << "problem load error" <<  std::endl;
+            return nullptr;
+        }
+
+        FARPROC getBrokerAddress = GetProcAddress(problemModule, "getBroker");
+        if (getBrokerAddress == NULL){
+            std::cout << "get broker address error" << std::endl;
+            FreeLibrary(problemModule);
+            return nullptr;
+        }
+
+        typedef void*(*getBrogerT)();
+        IBroker* broker = reinterpret_cast<IBroker*>(   ((getBrogerT)getBrokerAddress)()   );
+        if (broker == nullptr){
+            std::cout << "broker == nullptr" << std::endl;
+            FreeLibrary(problemModule);
+            return nullptr;
+        }
+        return broker;
+    }
+
+    void testEval(IProblem* problem){
+        auto args = IVector::createVector(dim, e11);
+        auto params = IVector::createVector(dim, epipi);
+        auto lBoundary = IVector::createVector(dim, em5m5);
+        auto rBoundary = IVector::createVector(dim, e55);
+        auto grid = IMultiIndex::createMultiIndex(dim, gridIndex);
+        auto order = IMultiIndex::createMultiIndex(dim, orderIndex);
+        auto domain = ICompact::createCompact(lBoundary, rBoundary, grid);
+        problem->setArgsDomain(domain);
+        problem->setParamsDomain(domain);
+        problem->setParams(params);
+
+        auto it = domain->getBegin(order);
+        if (it == nullptr){
+            std::cout << "it in null" << std::endl;
+            return;
+        }
+        while (it->isValid()){
+            IVector* vec;
+            it->getVectorCopy(vec);
+            if (vec == nullptr){
+                std::cout << "nA n" << std::endl;
+            }else{
+                std::cout << problem->evalByArgs(vec) << std::endl;
+            }
+
+            delete vec;
+            vec = nullptr;
+            it->next();
+        }
+        delete it;
+        std::cout << std::endl;
+    }
+
+    void testIProblem(){
+        HINSTANCE problemModule = NULL;
+        IBroker* broker = loadBroker(problemModule);
+        if (broker == nullptr)
+            return;
+
+        if (!broker->canCastTo(IBroker::INTERFACE_IMPL::IPROBLEM)){
+            std::cout << "can't cast impl to problem" << std::endl;
+            FreeLibrary(problemModule);
+            broker->release();
+            return;
+        }
+
+        auto problem = reinterpret_cast<IProblem*>(broker->getInterfaceImpl(IBroker::INTERFACE_IMPL::IPROBLEM));
+        if (problem == nullptr){
+            std::cout << "get problem impl error" << std::endl;
+            FreeLibrary(problemModule);
+            broker->release();
+            return;
+        }
+
+        testEval(problem);
+    }
+}
+
